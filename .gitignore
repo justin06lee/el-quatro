@@ -1,0 +1,38 @@
+# ESP-IDF build artifacts
+**/build/
+**/sdkconfig
+**/sdkconfig.old
+**/sdkconfig.ci
+**/managed_components/
+**/dependencies.lock
+
+# Binaries and object files
+*.bin
+*.elf
+*.map
+*.o
+*.a
+
+# Arduino IDE leftovers
+*.ino.bin
+*.ino.elf
+
+# Python leftovers (for pytest or scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# VS Code / IDE settings (optional but recommended to keep clean)
+.vscode/
+.idea/
+*.swp
+*.bak
