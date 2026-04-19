@@ -1,12 +1,11 @@
 #include <WiFi.h>
-#include <ESPAsyncWebSrv.h>
+#include <WebServer.h>
 #include <ArduinoJson.h>
 #include "cluster_config.h"
 
 // *** CHANGE THIS FOR EACH WORKER: 1, 2, or 3 ***
 #define WORKER_ID 1
 
-// Pick the matching IP
 #if WORKER_ID == 1
   IPAddress staticIP(WORKER_1_IP);
 #elif WORKER_ID == 2
@@ -15,85 +14,87 @@
   IPAddress staticIP(WORKER_3_IP);
 #endif
 
-IPAddress gateway(GATEWAY_IP);
-IPAddress subnet(255, 255, 255, 0);
+IPAddress clusterGateway(GATEWAY_CLUSTER_IP);
+IPAddress subnet(CLUSTER_SUBNET);
 
-AsyncWebServer server(WORKER_PORT);
+WebServer server(WORKER_PORT);
 
 unsigned long requestCount = 0;
 unsigned long startTime = 0;
+
+void handleRoot() {
+  requestCount++;
+  String html = "<!DOCTYPE html><html><body>";
+  html += "<h1>Hello from Worker " + String(WORKER_ID) + "</h1>";
+  html += "<p>Served by node " + String(WORKER_ID) + " on cluster network</p>";
+  html += "<p>Requests handled: " + String(requestCount) + "</p>";
+  html += "<p>Internal IP: " + WiFi.localIP().toString() + "</p>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleHealth() {
+  JsonDocument doc;
+  doc["worker_id"] = WORKER_ID;
+  doc["status"] = "healthy";
+  doc["uptime_sec"] = (millis() - startTime) / 1000;
+  doc["requests_served"] = requestCount;
+  doc["free_heap"] = ESP.getFreeHeap();
+  doc["ip"] = WiFi.localIP().toString();
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handleData() {
+  requestCount++;
+  JsonDocument doc;
+  doc["worker"] = WORKER_ID;
+  doc["message"] = "Data from worker " + String(WORKER_ID);
+  doc["timestamp"] = millis();
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  WiFi.config(staticIP, gateway, subnet);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.config(staticIP, clusterGateway, subnet);
+  WiFi.begin(CLUSTER_SSID, CLUSTER_PASSWORD);
 
-  Serial.printf("Worker %d connecting to WiFi...\n", WORKER_ID);
+  Serial.printf("Worker %d connecting to cluster network '%s'...\n", WORKER_ID, CLUSTER_SSID);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   Serial.printf("\nWorker %d online at %s\n", WORKER_ID, WiFi.localIP().toString().c_str());
 
+  delay(1000);  // let the network stack stabilize
+
   startTime = millis();
 
-  // --- ROUTES ---
-
-  // Main content route — this is what the gateway forwards visitors to
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    requestCount++;
-    String html = "<!DOCTYPE html><html><body>";
-    html += "<h1>Hello from Worker " + String(WORKER_ID) + "</h1>";
-    html += "<p>This page was served by node " + String(WORKER_ID) + "</p>";
-    html += "<p>Requests handled by this node: " + String(requestCount) + "</p>";
-    html += "<p>IP: " + WiFi.localIP().toString() + "</p>";
-    html += "</body></html>";
-    request->send(200, "text/html", html);
-  });
-
-  // Health check endpoint — the gateway pings this
-  server.on("/health", HTTP_GET, [](AsyncWebServerRequest *request) {
-    JsonDocument doc;
-    doc["worker_id"] = WORKER_ID;
-    doc["status"] = "healthy";
-    doc["uptime_sec"] = (millis() - startTime) / 1000;
-    doc["requests_served"] = requestCount;
-    doc["free_heap"] = ESP.getFreeHeap();
-    doc["ip"] = WiFi.localIP().toString();
-
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
-  });
-
-  // A sample API endpoint — shows the workers can host anything
-  server.on("/api/data", HTTP_GET, [](AsyncWebServerRequest *request) {
-    requestCount++;
-    JsonDocument doc;
-    doc["worker"] = WORKER_ID;
-    doc["message"] = "Data from worker " + String(WORKER_ID);
-    doc["timestamp"] = millis();
-
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
-  });
+  server.on("/", handleRoot);
+  server.on("/health", handleHealth);
+  server.on("/api/data", handleData);
 
   server.begin();
-  Serial.printf("Worker %d web server started on port %d\n", WORKER_ID, WORKER_PORT);
+  Serial.printf("Worker %d server started on port %d\n", WORKER_ID, WORKER_PORT);
 }
 
 void loop() {
-  // Reconnect Wi-Fi if dropped
+  server.handleClient();
+
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi lost, reconnecting...");
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.println("Lost cluster connection, reconnecting...");
+    WiFi.begin(CLUSTER_SSID, CLUSTER_PASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
     }
-    Serial.println("Reconnected.");
+    Serial.println("Reconnected to cluster.");
   }
-  delay(1000);
+  delay(10);
 }
