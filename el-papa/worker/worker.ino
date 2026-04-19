@@ -15,7 +15,7 @@
   IPAddress staticIP(WORKER_3_IP);
 #endif
 
-IPAddress gateway(192, 168, 1, 1);    // your router IP
+IPAddress gateway(GATEWAY_IP);
 IPAddress subnet(255, 255, 255, 0);
 
 AsyncWebServer server(WORKER_PORT);
@@ -27,8 +27,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // Connect to Wi-Fi with static IP
-  // WiFi.config(staticIP, gateway, subnet);
+  WiFi.config(staticIP, gateway, subnet);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   Serial.printf("Worker %d connecting to WiFi...\n", WORKER_ID);
