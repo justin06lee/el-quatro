@@ -4,14 +4,14 @@
 #include "cluster_config.h"
 
 // *** CHANGE THIS FOR EACH WORKER: 1, 2, or 3 ***
-#define WORKER_ID 1
+#define WORKER_ID 3
 
 #if WORKER_ID == 1
-  IPAddress staticIP(WORKER_1_IP);
+IPAddress staticIP(WORKER_1_IP);
 #elif WORKER_ID == 2
-  IPAddress staticIP(WORKER_2_IP);
+IPAddress staticIP(WORKER_2_IP);
 #elif WORKER_ID == 3
-  IPAddress staticIP(WORKER_3_IP);
+IPAddress staticIP(WORKER_3_IP);
 #endif
 
 IPAddress clusterGateway(GATEWAY_CLUSTER_IP);
